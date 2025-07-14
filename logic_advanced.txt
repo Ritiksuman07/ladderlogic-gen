@@ -1,0 +1,6 @@
+IF Start AND NOT Stop THEN Motor
+IF (Start OR Reset) THEN TON Timer1, 5s
+IF Timer1 THEN Lamp
+IF CountBtn THEN CTU Counter1, 10
+IF Counter1 > 5 THEN Alarm
+IF (Button1 OR (Button2 AND NOT Button3)) THEN Lamp, Buzzer 
