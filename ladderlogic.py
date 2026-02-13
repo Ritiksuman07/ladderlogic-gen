@@ -183,29 +183,36 @@ def timer_counter_to_ladder(tc_expr, platform, indent='     '):
     return ''
 
 def generate_ladder(expr, outputs, platform):
-    # Handle OR at the top level as separate rungs
-    if expr.kind == 'OR':
-        left_ladder = generate_ladder(expr.left, outputs, platform)
-        right_ladder = generate_ladder(expr.right, outputs, platform)
-        ladders = []
-        if left_ladder:
-            ladders.append(left_ladder)
-        if right_ladder:
-            ladders.append(right_ladder)
-        return '\n'.join(str(l) for l in ladders)
-    rung_body = expr_to_ladder(expr, platform)
-    if rung_body is None:
-        return ''
-    rung = f'// Rung\n|----{rung_body}----( )----|\n'
-    # Check for timer/counter outputs
-    tc_outputs = [o for o in outputs if isinstance(o, ExprNode) and o.kind in ('TIMER', 'COUNTER')]
-    normal_outputs = [o for o in outputs if isinstance(o, str)]
-    if normal_outputs:
-        rung += '     ' + ', '.join(normal_outputs) + '\n'
-    for tc in tc_outputs:
-        rung += timer_counter_to_ladder(tc, platform)
-    rung += '\n'
-    return rung
+    def to_dnf(node):
+        if node.kind == 'OR':
+            return to_dnf(node.left) + to_dnf(node.right)
+        if node.kind == 'AND':
+            left_terms = to_dnf(node.left)
+            right_terms = to_dnf(node.right)
+            combined = []
+            for left in left_terms:
+                for right in right_terms:
+                    combined.append(ExprNode('AND', left=left, right=right))
+            return combined
+        return [node]
+
+    def rung_for_expr(rung_expr):
+        rung_body = expr_to_ladder(rung_expr, platform)
+        if rung_body is None:
+            return ''
+        rung = f'// Rung\n|----{rung_body}----( )----|\n'
+        # Check for timer/counter outputs
+        tc_outputs = [o for o in outputs if isinstance(o, ExprNode) and o.kind in ('TIMER', 'COUNTER')]
+        normal_outputs = [o for o in outputs if isinstance(o, str)]
+        if normal_outputs:
+            rung += '     ' + ', '.join(normal_outputs) + '\n'
+        for tc in tc_outputs:
+            rung += timer_counter_to_ladder(tc, platform)
+        rung += '\n'
+        return rung
+
+    ladders = [rung_for_expr(rung_expr) for rung_expr in to_dnf(expr)]
+    return '\n'.join(ladder for ladder in ladders if ladder)
 
 # --- Main CLI ---
 def main():
